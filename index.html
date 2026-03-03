@@ -1587,6 +1587,29 @@
                 }
             }
             
+            // Также добавляем пользователей из Firebase (если есть)
+            const playersRef = database.ref('players');
+            playersRef.once('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    for (let id in data) {
+                        const username = '@' + id;
+                        if (!users[username]) {
+                            users[username] = {
+                                password: '0000', // пароль по умолчанию
+                                stars: data[id].stars || 0,
+                                stats: { wins: data[id].wins || 0, losses: 0, draws: 0 },
+                                matchHistory: [],
+                                withdrawHistory: [],
+                                withdrawEndTime: null,
+                                ownedItems: ["default_bg", "default_x", "default_o"],
+                                equipped: { background: "default_bg", xskin: "default_x", oskin: "default_o", effect: null }
+                            };
+                        }
+                    }
+                }
+            });
+            
             return users;
         }
 
