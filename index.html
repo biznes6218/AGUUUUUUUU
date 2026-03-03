@@ -129,8 +129,45 @@
             50% { box-shadow: 0 0 20px rgba(255,215,0,0.8); }
         }
 
-        #leaderboardBox {
+        /* Перемещаемые менюшки */
+        .draggable {
             position: absolute;
+            cursor: move;
+            user-select: none;
+            transition: box-shadow 0.2s;
+            z-index: 90;
+        }
+
+        .draggable:active {
+            cursor: grabbing;
+        }
+
+        .draggable .drag-handle {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 30px;
+            background: linear-gradient(135deg, #4a90e2, #357abd);
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: white;
+            cursor: move;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .draggable .drag-handle::before {
+            content: "⋮⋮";
+            margin-right: 10px;
+            font-size: 16px;
+            opacity: 0.8;
+        }
+
+        #leaderboardBox {
             left: 20px;
             top: 50%;
             transform: translateY(-50%);
@@ -138,9 +175,9 @@
             background: rgba(28, 28, 28, 0.95);
             backdrop-filter: blur(10px);
             padding: 20px;
+            padding-top: 45px;
             border-radius: 20px;
             border: 1px solid #4a90e2;
-            z-index: 90;
             max-height: 80vh;
             overflow-y: auto;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
@@ -448,10 +485,15 @@
             background: rgba(28, 28, 28, 0.95);
             backdrop-filter: blur(10px);
             padding: 20px;
+            padding-top: 45px;
             border-radius: 20px;
             border: 1px solid #4a90e2;
             max-height: 70vh;
             overflow-y: auto;
+        }
+
+        #matchHistoryBox .drag-handle {
+            background: linear-gradient(135deg, #ff9800, #f44336);
         }
 
         #matchHistoryBox h3 {
@@ -808,7 +850,6 @@
             font-size: 40px;
             background: #1e1e1e;
             position: relative;
-            overflow: hidden;
         }
 
         .item-rarity {
@@ -1207,7 +1248,9 @@
         <div id="starsDisplay">⭐ 0</div>
     </div>
 
-    <div id="leaderboardBox">
+    <!-- ПЕРЕМЕЩАЕМАЯ ТАБЛИЦА ЛИДЕРОВ -->
+    <div id="leaderboardBox" class="draggable">
+        <div class="drag-handle" id="leaderboardDrag">Таблица лидеров</div>
         <div id="leaderboardHeader">
             <h3>🏆 Топ игроков</h3>
             <div class="leaderboard-tabs">
@@ -1219,7 +1262,9 @@
         <div class="leaderboard-count" id="leaderboardCount">Загрузка...</div>
     </div>
 
-    <div id="matchHistoryBox">
+    <!-- ПЕРЕМЕЩАЕМАЯ ИСТОРИЯ МАТЧЕЙ -->
+    <div id="matchHistoryBox" class="draggable">
+        <div class="drag-handle" id="historyDrag">История матчей</div>
         <h3>📊 Последние матчи</h3>
         <div id="matchHistory"></div>
     </div>
@@ -1379,6 +1424,49 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
     <script>
+        // Функция для перемещения элементов
+        function makeDraggable(element) {
+            let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+            const handle = element.querySelector('.drag-handle');
+            
+            if (handle) {
+                handle.onmousedown = dragMouseDown;
+            } else {
+                element.onmousedown = dragMouseDown;
+            }
+
+            function dragMouseDown(e) {
+                e.preventDefault();
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                document.onmouseup = closeDragElement;
+                document.onmousemove = elementDrag;
+            }
+
+            function elementDrag(e) {
+                e.preventDefault();
+                pos1 = pos3 - e.clientX;
+                pos2 = pos4 - e.clientY;
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                
+                let newTop = element.offsetTop - pos2;
+                let newLeft = element.offsetLeft - pos1;
+                
+                // Ограничиваем перемещение в пределах окна
+                newTop = Math.max(0, Math.min(newTop, window.innerHeight - element.offsetHeight));
+                newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - element.offsetWidth));
+                
+                element.style.top = newTop + "px";
+                element.style.left = newLeft + "px";
+            }
+
+            function closeDragElement() {
+                document.onmouseup = null;
+                document.onmousemove = null;
+            }
+        }
+
         // ВАША КОНФИГУРАЦИЯ FIREBASE
         const firebaseConfig = {
             apiKey: "AIzaSyDbStuT78ZanBoS3tdR3G86-t6mf9jmVdU",
@@ -1462,6 +1550,14 @@
         }
         createStars();
 
+        // Делаем элементы перемещаемыми
+        setTimeout(() => {
+            const leaderboard = document.getElementById('leaderboardBox');
+            const history = document.getElementById('matchHistoryBox');
+            makeDraggable(leaderboard);
+            makeDraggable(history);
+        }, 1000);
+
         // Данные
         let currentUser = null;
         let stars = 0;
@@ -1503,292 +1599,27 @@
         let duelBet = 15;
         let sentChallenge = null;
 
-        // Товары в магазине с новыми STEAM-подобными фонами
+        // Товары в магазине
         const shopItems = [
-            // Стандартные фоны (оставляем как есть)
-            { id: "default_bg", name: "Стандарт", category: "background", price: 0, rarity: "common", style: "#0f0f0f", isAnimated: false },
-            { id: "sunset_bg", name: "Закат", category: "background", price: 50, rarity: "common", style: "linear-gradient(135deg,#ff512f,#dd2476)", isAnimated: false },
-            { id: "ocean_bg", name: "Океан", category: "background", price: 80, rarity: "common", style: "linear-gradient(135deg,#2193b0,#6dd5ed)", isAnimated: false },
-            { id: "neon_bg", name: "Неон", category: "background", price: 120, rarity: "rare", style: "linear-gradient(135deg,#0f0c29,#302b63,#24243e)", isAnimated: false },
-            { id: "galaxy_bg", name: "Галактика", category: "background", price: 150, rarity: "rare", style: "radial-gradient(circle,#1e3c72,#2a5298,#000)", isAnimated: false },
-            
-            // НОВЫЕ STEAM-ПОДОБНЫЕ ФОНЫ (анимированные)
-            // Brawl Stars
-            { 
-                id: "brawl_stars_bg", 
-                name: "Brawl Stars", 
-                category: "background", 
-                price: 300, 
-                rarity: "epic", 
-                style: "linear-gradient(135deg, #f9d423, #f83600)",
-                isAnimated: true,
-                animation: "brawlAnimation",
-                preview: "⭐"
-            },
-            // PUBG
-            { 
-                id: "pubg_bg", 
-                name: "PUBG", 
-                category: "background", 
-                price: 350, 
-                rarity: "epic", 
-                style: "linear-gradient(135deg, #333333, #dd1818)",
-                isAnimated: true,
-                animation: "pubgAnimation",
-                preview: "🔫"
-            },
-            // CS:GO / Counter-Strike
-            { 
-                id: "csgo_bg", 
-                name: "CS:GO", 
-                category: "background", 
-                price: 400, 
-                rarity: "legendary", 
-                style: "linear-gradient(135deg, #8e9eab, #eef2f3)",
-                isAnimated: true,
-                animation: "csgoAnimation",
-                preview: "🔫"
-            },
-            // Rust
-            { 
-                id: "rust_bg", 
-                name: "Rust", 
-                category: "background", 
-                price: 400, 
-                rarity: "legendary", 
-                style: "linear-gradient(135deg, #8e0e00, #1f1c18)",
-                isAnimated: true,
-                animation: "rustAnimation",
-                preview: "🪓"
-            },
-            // Dota 2
-            { 
-                id: "dota2_bg", 
-                name: "Dota 2", 
-                category: "background", 
-                price: 450, 
-                rarity: "legendary", 
-                style: "linear-gradient(135deg, #8e2de2, #4a00e0)",
-                isAnimated: true,
-                animation: "dotaAnimation",
-                preview: "⚔️"
-            },
-            // Cyberpunk 2077
-            { 
-                id: "cyberpunk_bg", 
-                name: "Cyberpunk 2077", 
-                category: "background", 
-                price: 500, 
-                rarity: "legendary", 
-                style: "linear-gradient(135deg, #f7b733, #fc4a1a)",
-                isAnimated: true,
-                animation: "cyberpunkAnimation",
-                preview: "⚡"
-            },
-            // Minecraft
-            { 
-                id: "minecraft_bg", 
-                name: "Minecraft", 
-                category: "background", 
-                price: 500, 
-                rarity: "legendary", 
-                style: "linear-gradient(135deg, #1d976c, #93f9b9)",
-                isAnimated: true,
-                animation: "minecraftAnimation",
-                preview: "⛏️"
-            },
-            // Among Us
-            { 
-                id: "amongus_bg", 
-                name: "Among Us", 
-                category: "background", 
-                price: 350, 
-                rarity: "epic", 
-                style: "linear-gradient(135deg, #8e44ad, #3498db)",
-                isAnimated: true,
-                animation: "amongusAnimation",
-                preview: "👾"
-            },
-            // GTA V
-            { 
-                id: "gta_bg", 
-                name: "GTA V", 
-                category: "background", 
-                price: 450, 
-                rarity: "legendary", 
-                style: "linear-gradient(135deg, #f12711, #f5af19)",
-                isAnimated: true,
-                animation: "gtaAnimation",
-                preview: "🚗"
-            },
-            // Valorant
-            { 
-                id: "valorant_bg", 
-                name: "Valorant", 
-                category: "background", 
-                price: 400, 
-                rarity: "legendary", 
-                style: "linear-gradient(135deg, #ff416c, #ff4b2b)",
-                isAnimated: true,
-                animation: "valorantAnimation",
-                preview: "🔫"
-            },
-            // Fortnite
-            { 
-                id: "fortnite_bg", 
-                name: "Fortnite", 
-                category: "background", 
-                price: 400, 
-                rarity: "legendary", 
-                style: "linear-gradient(135deg, #3a1c71, #d76d77, #ffaf7b)",
-                isAnimated: true,
-                animation: "fortniteAnimation",
-                preview: "🕹️"
-            },
-            // League of Legends
-            { 
-                id: "lol_bg", 
-                name: "League of Legends", 
-                category: "background", 
-                price: 450, 
-                rarity: "legendary", 
-                style: "linear-gradient(135deg, #0f2027, #203a43, #2c5364)",
-                isAnimated: true,
-                animation: "lolAnimation",
-                preview: "🎮"
-            },
-            // Call of Duty
-            { 
-                id: "cod_bg", 
-                name: "Call of Duty", 
-                category: "background", 
-                price: 350, 
-                rarity: "epic", 
-                style: "linear-gradient(135deg, #000428, #004e92)",
-                isAnimated: true,
-                animation: "codAnimation",
-                preview: "🎯"
-            },
-            // Apex Legends
-            { 
-                id: "apex_bg", 
-                name: "Apex Legends", 
-                category: "background", 
-                price: 400, 
-                rarity: "legendary", 
-                style: "linear-gradient(135deg, #ff0084, #33001b)",
-                isAnimated: true,
-                animation: "apexAnimation",
-                preview: "⚡"
-            },
-            // Overwatch
-            { 
-                id: "overwatch_bg", 
-                name: "Overwatch", 
-                category: "background", 
-                price: 350, 
-                rarity: "epic", 
-                style: "linear-gradient(135deg, #ffb75e, #ed8f03)",
-                isAnimated: true,
-                animation: "overwatchAnimation",
-                preview: "🎯"
-            },
-            // Rainbow Six Siege
-            { 
-                id: "r6_bg", 
-                name: "Rainbow Six", 
-                category: "background", 
-                price: 400, 
-                rarity: "legendary", 
-                style: "linear-gradient(135deg, #1e130c, #9a8478)",
-                isAnimated: true,
-                animation: "r6Animation",
-                preview: "🔫"
-            },
-            // World of Warcraft
-            { 
-                id: "wow_bg", 
-                name: "World of Warcraft", 
-                category: "background", 
-                price: 500, 
-                rarity: "legendary", 
-                style: "linear-gradient(135deg, #1d976c, #93f9b9)",
-                isAnimated: true,
-                animation: "wowAnimation",
-                preview: "⚔️"
-            },
-            // The Witcher
-            { 
-                id: "witcher_bg", 
-                name: "The Witcher", 
-                category: "background", 
-                price: 450, 
-                rarity: "legendary", 
-                style: "linear-gradient(135deg, #141e30, #243b55)",
-                isAnimated: true,
-                animation: "witcherAnimation",
-                preview: "⚔️"
-            },
-            // Dark Souls
-            { 
-                id: "darksouls_bg", 
-                name: "Dark Souls", 
-                category: "background", 
-                price: 500, 
-                rarity: "legendary", 
-                style: "linear-gradient(135deg, #232526, #414345)",
-                isAnimated: true,
-                animation: "darksoulsAnimation",
-                preview: "⚔️"
-            },
-            // Elden Ring
-            { 
-                id: "eldenring_bg", 
-                name: "Elden Ring", 
-                category: "background", 
-                price: 550, 
-                rarity: "legendary", 
-                style: "linear-gradient(135deg, #ffd89b, #19547b)",
-                isAnimated: true,
-                animation: "eldenringAnimation",
-                preview: "👑"
-            },
-            // FIFA
-            { 
-                id: "fifa_bg", 
-                name: "FIFA", 
-                category: "background", 
-                price: 300, 
-                rarity: "epic", 
-                style: "linear-gradient(135deg, #2b5876, #4e4376)",
-                isAnimated: true,
-                animation: "fifaAnimation",
-                preview: "⚽"
-            },
-            // Need for Speed
-            { 
-                id: "nfs_bg", 
-                name: "Need for Speed", 
-                category: "background", 
-                price: 350, 
-                rarity: "epic", 
-                style: "linear-gradient(135deg, #c21500, #ffc500)",
-                isAnimated: true,
-                animation: "nfsAnimation",
-                preview: "🚗"
-            },
-            // The Sims
-            { 
-                id: "sims_bg", 
-                name: "The Sims", 
-                category: "background", 
-                price: 300, 
-                rarity: "epic", 
-                style: "linear-gradient(135deg, #a8edea, #fed6e3)",
-                isAnimated: true,
-                animation: "simsAnimation",
-                preview: "🏠"
-            },
+            // Фоны (20+ вариантов)
+            { id: "default_bg", name: "Стандарт", category: "background", price: 0, rarity: "common", style: "#0f0f0f" },
+            { id: "sunset_bg", name: "Закат", category: "background", price: 50, rarity: "common", style: "linear-gradient(135deg,#ff512f,#dd2476)" },
+            { id: "ocean_bg", name: "Океан", category: "background", price: 80, rarity: "common", style: "linear-gradient(135deg,#2193b0,#6dd5ed)" },
+            { id: "neon_bg", name: "Неон", category: "background", price: 120, rarity: "rare", style: "linear-gradient(135deg,#0f0c29,#302b63,#24243e)" },
+            { id: "galaxy_bg", name: "Галактика", category: "background", price: 150, rarity: "rare", style: "radial-gradient(circle,#1e3c72,#2a5298,#000)" },
+            { id: "lava_bg", name: "Лава", category: "background", price: 200, rarity: "rare", style: "linear-gradient(135deg,#f12711,#f5af19)" },
+            { id: "forest_bg", name: "Лес", category: "background", price: 200, rarity: "rare", style: "linear-gradient(135deg,#134e5e,#71b280)" },
+            { id: "night_bg", name: "Ночь", category: "background", price: 250, rarity: "rare", style: "linear-gradient(135deg,#141e30,#243b55)" },
+            { id: "aurora_bg", name: "Северное сияние", category: "background", price: 300, rarity: "epic", style: "linear-gradient(135deg,#1a2980,#26d0ce)" },
+            { id: "cherry_bg", name: "Сакура", category: "background", price: 300, rarity: "epic", style: "linear-gradient(135deg,#f857a6,#ff5858)" },
+            { id: "royal_bg", name: "Королевский", category: "background", price: 350, rarity: "epic", style: "linear-gradient(135deg,#834d9b,#d04ed6)" },
+            { id: "cyber_bg", name: "Киберпанк", category: "background", price: 350, rarity: "epic", style: "linear-gradient(135deg,#00f260,#0575e6)" },
+            { id: "sunrise_bg", name: "Рассвет", category: "background", price: 400, rarity: "epic", style: "linear-gradient(135deg,#f2994a,#f2c94c)" },
+            { id: "deepsea_bg", name: "Глубина", category: "background", price: 400, rarity: "epic", style: "linear-gradient(135deg,#0f2027,#203a43,#2c5364)" },
+            { id: "candy_bg", name: "Конфета", category: "background", price: 450, rarity: "legendary", style: "linear-gradient(135deg,#d9afd9,#97d9e1)" },
+            { id: "rainbow_bg", name: "Радуга", category: "background", price: 500, rarity: "legendary", style: "linear-gradient(135deg,#ff9a9e,#fad0c4,#fad0c4)" },
+            { id: "matrix_bg", name: "Матрица", category: "background", price: 500, rarity: "legendary", style: "linear-gradient(135deg,#0f0f0f,#0f0f0f), repeating-linear-gradient(0deg, #00ff00, #00ff00 2px, transparent 2px, transparent 4px)" },
+            { id: "space_bg", name: "Космос", category: "background", price: 600, rarity: "legendary", style: "radial-gradient(circle at 20% 30%, #1e3c72, #2a5298, #000)" },
             
             // Скины для X (20+ вариантов)
             { id: "default_x", name: "Классический X", category: "xskin", price: 0, rarity: "common", symbol: "❌" },
@@ -1842,126 +1673,6 @@
             { id: "effect_neon", name: "Неон", category: "effect", price: 300, rarity: "epic", class: "effect-neon", preview: "💫" },
             { id: "effect_matrix", name: "Матрица", category: "effect", price: 350, rarity: "legendary", class: "effect-matrix", preview: "💚" }
         ];
-
-        // Добавляем CSS-анимации для новых фонов
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes brawlAnimation {
-                0% { background-position: 0% 0%; }
-                50% { background-position: 100% 100%; }
-                100% { background-position: 0% 0%; }
-            }
-            @keyframes pubgAnimation {
-                0% { transform: scale(1); opacity: 1; }
-                50% { transform: scale(1.1); opacity: 0.8; }
-                100% { transform: scale(1); opacity: 1; }
-            }
-            @keyframes csgoAnimation {
-                0% { filter: hue-rotate(0deg); }
-                100% { filter: hue-rotate(360deg); }
-            }
-            @keyframes rustAnimation {
-                0% { background-size: 100% 100%; }
-                50% { background-size: 120% 120%; }
-                100% { background-size: 100% 100%; }
-            }
-            @keyframes dotaAnimation {
-                0% { box-shadow: 0 0 10px #8e2de2; }
-                50% { box-shadow: 0 0 30px #4a00e0; }
-                100% { box-shadow: 0 0 10px #8e2de2; }
-            }
-            @keyframes cyberpunkAnimation {
-                0% { filter: brightness(1); }
-                50% { filter: brightness(1.5); }
-                100% { filter: brightness(1); }
-            }
-            @keyframes minecraftAnimation {
-                0% { background-size: 100% 100%; }
-                50% { background-size: 110% 110%; }
-                100% { background-size: 100% 100%; }
-            }
-            @keyframes amongusAnimation {
-                0% { transform: rotate(0deg); }
-                50% { transform: rotate(5deg); }
-                100% { transform: rotate(0deg); }
-            }
-            @keyframes gtaAnimation {
-                0% { background-position: 0% 0%; }
-                50% { background-position: 100% 100%; }
-                100% { background-position: 0% 0%; }
-            }
-            @keyframes valorantAnimation {
-                0% { filter: hue-rotate(0deg) brightness(1); }
-                50% { filter: hue-rotate(180deg) brightness(1.2); }
-                100% { filter: hue-rotate(360deg) brightness(1); }
-            }
-            @keyframes fortniteAnimation {
-                0% { background-size: 100% 100%; opacity: 1; }
-                50% { background-size: 150% 150%; opacity: 0.8; }
-                100% { background-size: 100% 100%; opacity: 1; }
-            }
-            @keyframes lolAnimation {
-                0% { filter: hue-rotate(0deg) saturate(1); }
-                50% { filter: hue-rotate(180deg) saturate(2); }
-                100% { filter: hue-rotate(360deg) saturate(1); }
-            }
-            @keyframes codAnimation {
-                0% { transform: translateX(0); }
-                50% { transform: translateX(10px); }
-                100% { transform: translateX(0); }
-            }
-            @keyframes apexAnimation {
-                0% { filter: brightness(1) contrast(1); }
-                50% { filter: brightness(1.2) contrast(1.2); }
-                100% { filter: brightness(1) contrast(1); }
-            }
-            @keyframes overwatchAnimation {
-                0% { background-position: 0% 0%; }
-                50% { background-position: 100% 100%; }
-                100% { background-position: 0% 0%; }
-            }
-            @keyframes r6Animation {
-                0% { filter: hue-rotate(0deg) blur(0px); }
-                50% { filter: hue-rotate(180deg) blur(1px); }
-                100% { filter: hue-rotate(360deg) blur(0px); }
-            }
-            @keyframes wowAnimation {
-                0% { transform: scale(1) rotate(0deg); }
-                50% { transform: scale(1.05) rotate(2deg); }
-                100% { transform: scale(1) rotate(0deg); }
-            }
-            @keyframes witcherAnimation {
-                0% { background-size: 100% 100%; }
-                50% { background-size: 110% 110%; }
-                100% { background-size: 100% 100%; }
-            }
-            @keyframes darksoulsAnimation {
-                0% { filter: grayscale(0); }
-                50% { filter: grayscale(0.5); }
-                100% { filter: grayscale(0); }
-            }
-            @keyframes eldenringAnimation {
-                0% { box-shadow: 0 0 10px #ffd89b; }
-                50% { box-shadow: 0 0 30px #19547b; }
-                100% { box-shadow: 0 0 10px #ffd89b; }
-            }
-            @keyframes fifaAnimation {
-                0% { transform: translateY(0); }
-                50% { transform: translateY(-5px); }
-                100% { transform: translateY(0); }
-            }
-            @keyframes nfsAnimation {
-                0% { background-position: 0% 0%; }
-                50% { background-position: 100% 100%; }
-                100% { background-position: 0% 0%; }
-            }
-            @keyframes simsAnimation {
-                0% { opacity: 1; }
-                50% { opacity: 0.8; }
-                100% { opacity: 1; }
-            }
-        `;
-        document.head.appendChild(style);
 
         // Установка сложности
         function setDifficulty(level) {
@@ -2950,16 +2661,11 @@
                 let rarityClass = 'rarity-' + item.rarity;
                 
                 if (item.category === 'background') {
-                    let previewStyle = item.style;
-                    if (item.isAnimated) {
-                        previewStyle += `; animation: ${item.animation} 5s infinite;`;
-                    }
                     div.innerHTML = `
-                        <div class="shopPreview" style="background:${previewStyle}; background-size: 200% 200%;"></div>
+                        <div class="shopPreview" style="background:${item.style}"></div>
                         <strong>${item.name}</strong> 
                         <span class="item-rarity ${rarityClass}">${item.rarity}</span><br>
                         Цена: ${item.price} ⭐<br>
-                        ${item.isAnimated ? '<span style="color: #4a90e2;">✨ Анимированный</span>' : ''}
                     `;
                 } else if (item.category === 'effect') {
                     div.innerHTML = `
@@ -3030,16 +2736,7 @@
         function applyBackground() {
             let bg = shopItems.find(i => i.id === equipped.background);
             if (bg) {
-                let bgStyle = bg.style;
-                if (bg.isAnimated) {
-                    // Добавляем анимацию к фону
-                    document.body.style.background = bgStyle;
-                    document.body.style.backgroundSize = '200% 200%';
-                    document.body.style.animation = `${bg.animation} 5s infinite`;
-                } else {
-                    document.body.style.background = bgStyle;
-                    document.body.style.animation = 'none';
-                }
+                document.body.style.background = bg.style;
             }
         }
 
